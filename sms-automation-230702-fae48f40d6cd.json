@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "sms-automation-230702",
+  "private_key_id": "fae48f40d6cdb68b400f0cc1a0dc2a539fce5bad",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCsSwS388i3r/nz\naBx1lEuxrJsBTipJTbUCXClAVwCmSDk+TSBzbXdIur8VglceVR2R5TMVbtW/h2zM\nq1CvmsVCxoi0He49aPD63ijaXcnyonKqo6BXIasgtnfEmjjWiuKMgCpbGSKaof5T\nLJU+2SOeIahYotnXaMyWC36nv/eGWsRs6qhbJLDcfm9KSLOcb61EX2PZRzH5qY7H\nfNEnHSjkqsMVXuuWuRdBT4Afx3PehnJxth3F+7kDG4kDLoUWJndn6jIiADuQ5jZ2\nZw2clHPmbuqXSfQnnaAkNq7pgFya7w1B22Xjr97CqB2PP3Ju9/VvBaTVy7zT4yso\nNEpZaRDdAgMBAAECggEAVHK+wNVOU+5+0nX8wQrrYQ5ruWORKXXbm2kF1SHv0REE\nccuG9Ny6Q105TLcisVzhzgFsHPzC6wpbYyQzO6deOaErHzGudM4rk6LxnjqrQfCq\nyIXEEQERKksVgDlhU5MmgNxPJnC2+9kb2bO4AWKX6SmxJKTJpqIY6RCAR4O5tNGX\n4PcBFqkHDylUcAec7Y9TFniyZPgFoCEN7PGxK/y/LbXelVVDPrfA30q5T4J6eq3k\nBaizk9bhIDA2CB0Dowi44k6Y9XfD6lf+8PQZZzb/lFmZeJiTwFW9ZnSTsmg3TPqK\n8vrQ2zKFWZLDIUdboJ8XMk3HmvFWTb0XEQDZCHDQFwKBgQDvZawMTtFeANiSnOE3\nqTHXRddte6eVSLM9zqtR1eHpxKjm7ZHMg6GwfkT11YCZWJtkKd72HCljTR/oZBsf\nBdqwWnDvszSGePisGiLBWhCAHTaxV5fj25IFHHE6NNrgComAd/8R+AOVLwMUMxMS\nLxc7QgO9FA70yx5w72EweTS5LwKBgQC4PfXFn6kY+Vzvt7RTjCVsl2VIwMTD3TUV\nZWG+hJdqmlm8uutXUMBamqOZ99+4csO5iFwTghkYoM8tA2tWB1XfHsmcGuESD4pr\n7/H0SkIymUki5ZWJv7LcBBn+urpUQb0x7JbvTTqAq0kH+RjCg3Yc4wPPjDTxg81l\nU4LaHA57swKBgQDmBEGH3d8qvBNa42M98NJTreZsamg9donJ9B4F1kRnMS68Gz2A\nTGV5yAkIT2htboZ3egehXrOhlsP2rOCmMSDLW0qx9PSd0/PSoJYOQzQhdHBNewUU\nyK6HPKnKLGi05UryZdltcWg32eDScrR7P0XKCQbAkFpCeDs6dbZjNcIjvwKBgA7H\nYZSVpxHKxuqvuLZO8p2QU16Pn/j6IIzz0fBfYGn7saES+VfKsXNTHjZ2jKqWAh86\n0e/6qpqwI44/zPdcpUW9iXyNJ2q0dm0MFUN8RW0boKM8+U7QYr+FULR/M/0YPN3p\nVX4imsPBeZ07HQJVWz8b8q1OWNzarronBcMLJxpDAoGBAL90+EuYb5XdLT3y0Shw\nwy5Y/8tZZLaYCaBEDMiQq9ipaEIBNPWNp7Csk+WYDrnike9bkqKlQtw8lqZ+5hE1\nzEPsR8tw3dIGeMQUqCf4+vTxL9LXMVl0gTgLEUq97ytIlYdwOptnCbspWL1VTXGa\natq0030BRNODzld2A0NzH1VP\n-----END PRIVATE KEY-----\n",
+  "client_email": "expense-tracker@sms-automation-230702.iam.gserviceaccount.com",
+  "client_id": "105622285347918919752",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/expense-tracker%40sms-automation-230702.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

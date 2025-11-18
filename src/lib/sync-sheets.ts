@@ -1,0 +1,135 @@
+import { prisma } from './prisma';
+import { getExpensesFromSheet, updateExpenseIdInSheet, SheetExpenseWithLocation } from './google-sheets';
+import { randomBytes } from 'crypto';
+
+/**
+ * Syncs expenses from Google Sheets to PostgreSQL
+ * Pulls any expenses that exist in Google Sheets but not in PostgreSQL
+ * This ensures Google Sheets remains the source of truth
+ */
+export async function syncExpensesFromSheets(): Promise<{
+  synced: number;
+  errors: string[];
+}> {
+  try {
+    console.log('[Sync] Starting sync from Google Sheets to PostgreSQL...');
+
+    // Get all expenses from Google Sheets with location info
+    const sheetExpenses = await getExpensesFromSheet({ includeLocation: true }) as SheetExpenseWithLocation[];
+    console.log(`[Sync] Found ${sheetExpenses.length} expenses in Google Sheets`);
+
+    // Get all expenses from PostgreSQL for duplicate checking
+    const existingExpenses = await prisma.expense.findMany({
+      select: {
+        id: true,
+        date: true,
+        amount: true,
+        description: true,
+        category: { select: { name: true } }
+      },
+    });
+    const existingIds = new Set(existingExpenses.map((e) => e.id));
+    console.log(`[Sync] Found ${existingIds.size} expenses in PostgreSQL`);
+
+    let synced = 0;
+    const errors: string[] = [];
+
+    for (const expense of sheetExpenses) {
+      try {
+        // If expense has no ID or empty ID, check for duplicates and generate new ID
+        let expenseId = expense.id;
+        let needsIdUpdate = false;
+
+        if (!expenseId || expenseId.trim() === '') {
+          // Check if this expense already exists by matching date, amount, and category
+          const duplicate = existingExpenses.find(
+            (e: { date: Date; amount: number; category: { name: string } }) =>
+              Math.abs(e.date.getTime() - expense.date.getTime()) < 1000 && // Same date (within 1 second)
+              Math.abs(e.amount - expense.amount) < 0.01 && // Same amount (within 1 cent)
+              e.category.name === expense.category
+          );
+
+          if (duplicate) {
+            console.log(`[Sync] Skipping duplicate expense: ${expense.description}`);
+            continue;
+          }
+
+          // Generate new ID for this expense
+          expenseId = randomBytes(12).toString('base64url');
+          needsIdUpdate = true;
+          console.log(`[Sync] Generated new ID for expense without ID: ${expenseId}`);
+        } else if (existingIds.has(expenseId)) {
+          // Expense already exists in PostgreSQL
+          continue;
+        }
+
+        // First, ensure the category exists
+        const categoryName = expense.category;
+
+        let category = await prisma.category.findFirst({
+          where: { name: categoryName },
+        });
+
+        if (!category) {
+          // Create the category with a default color
+          category = await prisma.category.create({
+            data: {
+              name: categoryName,
+              color: '#6B7280', // Default gray color
+            },
+          });
+          console.log(`[Sync] Created new category: ${categoryName}`);
+        }
+
+        // Create the expense in PostgreSQL
+        await prisma.expense.create({
+          data: {
+            id: expenseId,
+            date: expense.date,
+            description: expense.description,
+            amount: expense.amount,
+            categoryId: category.id,
+          },
+        });
+
+        // If we generated a new ID, write it back to Google Sheets
+        if (needsIdUpdate && expense._sheetName && expense._rowIndex !== undefined) {
+          await updateExpenseIdInSheet(expense._sheetName, expense._rowIndex, expenseId);
+          console.log(`[Sync] Updated Google Sheet with new ID: ${expenseId}`);
+        }
+
+        synced++;
+        console.log(`[Sync] Synced expense ${expenseId}: ${expense.description}`);
+      } catch (error) {
+        const errorMsg = `Failed to sync expense ${expense.id}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error(`[Sync] ${errorMsg}`);
+        errors.push(errorMsg);
+      }
+    }
+
+    console.log(`[Sync] Sync complete. Synced ${synced} expenses, ${errors.length} errors`);
+
+    return { synced, errors };
+  } catch (error) {
+    console.error('[Sync] Failed to sync expenses from Google Sheets:', error);
+    throw error;
+  }
+}
+
+/**
+ * Checks if sync is needed by comparing counts
+ * Returns true if Google Sheets has more expenses than PostgreSQL
+ */
+export async function isSyncNeeded(): Promise<boolean> {
+  try {
+    const [sheetExpenses, dbCount] = await Promise.all([
+      getExpensesFromSheet(),
+      prisma.expense.count(),
+    ]);
+
+    return sheetExpenses.length > dbCount;
+  } catch (error) {
+    console.error('[Sync] Error checking if sync is needed:', error);
+    return false;
+  }
+}
