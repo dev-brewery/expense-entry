@@ -14,10 +14,17 @@ async function getCategories() {
 async function createExpense(formData: FormData) {
   'use server'
 
+  // Parse date as local midnight to avoid timezone shifts
+  // Form date format: "YYYY-MM-DD" (e.g., "2025-12-01")
+  // Using Date constructor with components ensures user's intended date is preserved
+  const dateString = formData.get('date') as string
+  const [dateYear, dateMonth, dateDay] = dateString.split('-').map(Number)
+  const localDate = new Date(dateYear, dateMonth - 1, dateDay) // month is 0-indexed
+
   const data = {
     amount: parseFloat(formData.get('amount') as string),
     description: formData.get('description') as string,
-    date: new Date(formData.get('date') as string),
+    date: localDate,
     categoryId: formData.get('categoryId') as string,
     notes: formData.get('notes') as string || null,
   }
