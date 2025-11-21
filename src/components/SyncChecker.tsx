@@ -2,13 +2,32 @@
 
 import { useEffect, useState } from 'react';
 
+const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const LAST_SYNC_KEY = 'expense-tracker-last-sync';
+
 export function SyncChecker() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ synced: number } | null>(null);
 
   useEffect(() => {
     async function checkAndSync() {
+      console.log('[SyncChecker] Component mounted, starting sync check...');
       try {
+        // Check if enough time has passed since last sync
+        const lastSyncTime = localStorage.getItem(LAST_SYNC_KEY);
+        const now = Date.now();
+        console.log('[SyncChecker] Last sync timestamp:', lastSyncTime);
+
+        if (lastSyncTime) {
+          const timeSinceLastSync = now - parseInt(lastSyncTime, 10);
+          if (timeSinceLastSync < SYNC_INTERVAL_MS) {
+            console.log(
+              `[SyncChecker] Skipping sync, last sync was ${Math.round(timeSinceLastSync / 1000)}s ago`
+            );
+            return;
+          }
+        }
+
         // Check if sync is needed
         const checkResponse = await fetch('/api/sync');
         const { syncNeeded } = await checkResponse.json();
@@ -28,8 +47,13 @@ export function SyncChecker() {
 
           setSyncing(false);
         }
+
+        // Update last sync timestamp
+        localStorage.setItem(LAST_SYNC_KEY, now.toString());
+        console.log('[SyncChecker] Sync check complete');
       } catch (error) {
         console.error('[SyncChecker] Error during sync:', error);
+        console.error('[SyncChecker] Error details:', error instanceof Error ? error.message : String(error));
         setSyncing(false);
       }
     }
