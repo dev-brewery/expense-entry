@@ -179,3 +179,105 @@ Refactored the application to make the new expense form the default landing page
 
 ### Rollback
 If needed, revert the 4 modified files to restore the original hub-and-spoke navigation pattern.
+
+## 2025-11-21: Performance Optimization - Sync Throttling
+
+### Rationale
+The SyncChecker component was running on every page load, causing excessive Google Sheets API calls. This created performance issues and risked hitting rate limits (Google Sheets API: 100 requests per 100 seconds).
+
+**Issue Addressed**: Recommendation #3 from `CODE_REVIEW_ANALYSIS.md` - "Excessive Sync Operations"
+
+### Changes
+Implemented time-based throttling with localStorage to prevent sync checks from running more than once every 5 minutes.
+
+### Implementation
+
+**File Modified**: `src/components/SyncChecker.tsx`
+
+**Key Changes**:
+1. Added `SYNC_INTERVAL_MS` constant (5 minutes = 300,000ms)
+2. Added `LAST_SYNC_KEY` for localStorage persistence (`'expense-tracker-last-sync'`)
+3. Check timestamp before running sync:
+   - If last sync was < 5 minutes ago: Skip and log message
+   - If last sync was > 5 minutes ago (or never): Run sync check
+4. Update timestamp after every sync check (even if sync wasn't needed)
+5. Enhanced logging for debugging:
+   - Component mount notifications
+   - Timestamp tracking
+   - Skip messages with elapsed time
+   - Completion confirmations
+   - Detailed error messages
+
+**Code Pattern**:
+```typescript
+const lastSyncTime = localStorage.getItem(LAST_SYNC_KEY);
+const now = Date.now();
+
+if (lastSyncTime) {
+  const timeSinceLastSync = now - parseInt(lastSyncTime, 10);
+  if (timeSinceLastSync < SYNC_INTERVAL_MS) {
+    console.log(`[SyncChecker] Skipping sync, last sync was ${Math.round(timeSinceLastSync / 1000)}s ago`);
+    return;
+  }
+}
+// ... proceed with sync check
+localStorage.setItem(LAST_SYNC_KEY, now.toString());
+```
+
+### Impact
+
+**Before**:
+- User loads home page → Sync API call
+- User navigates to expenses → Sync API call
+- User views expense detail → Sync API call
+- **Result**: 3+ API calls in seconds
+
+**After**:
+- User loads home page → Sync API call
+- User navigates to expenses → Skipped (< 5 min)
+- User views expense detail → Skipped (< 5 min)
+- **Result**: 1 API call, 5-minute cooldown
+
+**Performance Improvements**:
+- Reduces Google Sheets API calls by ~80-90% during typical usage
+- Prevents hitting rate limits
+- Faster page navigation (no sync delay on subsequent loads)
+- Maintains data freshness with reasonable 5-minute window
+
+### Testing
+
+**Manual Test - Force Immediate Sync**:
+```javascript
+// In browser console
+localStorage.removeItem('expense-tracker-last-sync')
+location.reload()
+```
+
+**Check Last Sync Time**:
+```javascript
+// In browser console
+const timestamp = localStorage.getItem('expense-tracker-last-sync')
+const date = new Date(parseInt(timestamp))
+console.log('Last sync:', date.toLocaleString())
+```
+
+**Console Output Examples**:
+```
+[SyncChecker] Component mounted, starting sync check...
+[SyncChecker] Last sync timestamp: 1732204800000
+[SyncChecker] Skipping sync, last sync was 45s ago
+```
+
+### Files Modified
+- `src/components/SyncChecker.tsx`
+
+### Risk Assessment
+**Low Risk** - Backwards compatible change that only affects timing:
+- No changes to sync logic or data operations
+- No changes to API routes or database operations
+- Sync still runs on first load
+- Users can manually trigger sync by clearing localStorage
+- 5-minute window is reasonable for most use cases
+
+### Priority
+**High** - Performance optimization addressing code review recommendation
