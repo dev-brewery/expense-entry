@@ -1,38 +1,179 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/prisma'
+import { createExpenseSchema } from '@/lib/validations/expense'
 
-export default function Home() {
+async function getCategories() {
+  return await prisma.category.findMany({
+    orderBy: {
+      name: 'asc',
+    },
+  })
+}
+
+async function createExpense(formData: FormData) {
+  'use server'
+
+  // Parse date as local midnight to avoid timezone shifts
+  // Form date format: "YYYY-MM-DD" (e.g., "2025-12-01")
+  // Using Date constructor with components ensures user's intended date is preserved
+  const dateString = formData.get('date') as string
+  const [dateYear, dateMonth, dateDay] = dateString.split('-').map(Number)
+  const localDate = new Date(dateYear, dateMonth - 1, dateDay) // month is 0-indexed
+
+  const data = {
+    amount: parseFloat(formData.get('amount') as string),
+    description: formData.get('description') as string,
+    date: localDate,
+    categoryId: formData.get('categoryId') as string,
+    notes: formData.get('notes') as string || null,
+  }
+
+  const validatedData = createExpenseSchema.parse(data)
+
+  const expense = await prisma.expense.create({
+    data: validatedData,
+    include: {
+      category: true,
+    },
+  })
+
+  // Insert into Google Sheets
+  const { insertExpenseToSheet } = await import('@/lib/google-sheets')
+  await insertExpenseToSheet({
+    id: expense.id,
+    date: expense.date,
+    description: expense.description,
+    amount: expense.amount,
+    categoryName: expense.category.name,
+  })
+
+  // Extract month and year from the expense date
+  const month = expense.date.getMonth() + 1 // 1-12
+  const year = expense.date.getFullYear()
+
+  // Redirect to success page with category and month info
+  redirect(`/expenses/new/success?categoryId=${expense.categoryId}&month=${month}&year=${year}`)
+}
+
+export default async function Home() {
+  const categories = await getCategories()
+  const today = new Date().toISOString().split('T')[0]
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8">
-      <div className="max-w-2xl w-full space-y-8">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Expense Entry</h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            Track and manage your expenses efficiently
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
+    <div className="min-h-screen p-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Add New Expense</h1>
           <Link
             href="/expenses"
-            className="p-6 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
-            <h2 className="text-2xl font-semibold mb-2">View Expenses →</h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Browse and manage your expense records
-            </p>
-          </Link>
-
-          <Link
-            href="/expenses/new"
-            className="p-6 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
-          >
-            <h2 className="text-2xl font-semibold mb-2">Add Expense →</h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Create a new expense entry
-            </p>
+            View Expenses →
           </Link>
         </div>
+
+        <form action={createExpense} className="space-y-6">
+          <div>
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium mb-2"
+            >
+              Description *
+            </label>
+            <input
+              type="text"
+              id="description"
+              name="description"
+              required
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+              placeholder="e.g., Lunch at restaurant"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="amount" className="block text-sm font-medium mb-2">
+                Amount *
+              </label>
+              <input
+                type="number"
+                id="amount"
+                name="amount"
+                step="0.01"
+                min="0"
+                required
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+                placeholder="0.00"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="date" className="block text-sm font-medium mb-2">
+                Date *
+              </label>
+              <input
+                type="date"
+                id="date"
+                name="date"
+                defaultValue={today}
+                required
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="categoryId"
+              className="block text-sm font-medium mb-2"
+            >
+              Category *
+            </label>
+            <select
+              id="categoryId"
+              name="categoryId"
+              required
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+            >
+              <option value="">Select a category</option>
+              {categories.map((category: { id: string; name: string }) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="notes" className="block text-sm font-medium mb-2">
+              Notes
+            </label>
+            <textarea
+              id="notes"
+              name="notes"
+              rows={4}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+              placeholder="Additional notes (optional)"
+            />
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Create Expense
+            </button>
+            <Link
+              href="/expenses"
+              className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 px-6 py-3 rounded-lg font-medium transition-colors text-center"
+            >
+              Cancel
+            </Link>
+          </div>
+        </form>
       </div>
-    </main>
+    </div>
   )
 }

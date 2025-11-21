@@ -30,7 +30,7 @@ export default async function ExpensesPage() {
             </p>
           </div>
           <Link
-            href="/expenses/new"
+            href="/"
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
           >
             Add Expense
@@ -43,7 +43,7 @@ export default async function ExpensesPage() {
               No expenses yet
             </p>
             <Link
-              href="/expenses/new"
+              href="/"
               className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
             >
               Create your first expense

@@ -46,7 +46,7 @@ export default async function ExpenseSuccessPage({ searchParams }: PageProps) {
             Your expense has been successfully saved!
           </p>
           <Link
-            href="/expenses/new"
+            href="/"
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors inline-block"
           >
             Add Another Expense
@@ -99,7 +99,7 @@ export default async function ExpenseSuccessPage({ searchParams }: PageProps) {
 
         <div className="flex gap-4">
           <Link
-            href="/expenses/new"
+            href="/"
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors text-center"
           >
             Add Another

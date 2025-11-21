@@ -102,3 +102,80 @@ These changes accomplish the following goals:
 4. **Improved user experience** by showing category totals immediately after adding expenses
 
 All changes maintain backward compatibility with existing data and preserve the dual-write architecture where Google Sheets remains the source of truth and PostgreSQL serves as a performance cache.
+
+## 2025-11-21: UX Refactor - Expense Form as Landing Page
+
+### Rationale
+Users primarily visit the app to add expenses (99% use case). The previous hub-and-spoke navigation pattern created unnecessary friction by forcing users to choose between "View Expenses" and "Add Expense" on every visit.
+
+### Changes
+Refactored the application to make the new expense form the default landing page, eliminating the extra navigation step for the primary user workflow.
+
+### Implementation
+
+**1. Replaced Landing Page with Expense Form**
+- **File**: `src/app/page.tsx`
+- Replaced hub page content (two-card layout) with full expense form
+- Copied complete form functionality from `/expenses/new/page.tsx`:
+  - Form fields (description, amount, date, category, notes)
+  - `createExpense()` server action
+  - `getCategories()` helper function
+  - All validation and Google Sheets integration
+- Added subtle "View Expenses →" link in top-right corner for secondary navigation
+- Maintained "Cancel" button linking to `/expenses`
+
+**2. Converted Old Form Route to Redirect**
+- **File**: `src/app/expenses/new/page.tsx`
+- Replaced entire page with simple redirect to `/`
+- Maintains backward compatibility for bookmarks and external links
+
+**3. Updated Navigation Links in Expenses List**
+- **File**: `src/app/expenses/page.tsx`
+- Updated "Add Expense" button: `href="/expenses/new"` → `href="/"`
+- Updated "Create your first expense" link: `href="/expenses/new"` → `href="/"`
+- "Back to Home" link already correctly points to `/`
+
+**4. Updated Navigation Links in Success Page**
+- **File**: `src/app/expenses/new/success/page.tsx`
+- Updated "Add Another" button: `href="/expenses/new"` → `href="/"`
+- Updated "Add Another Expense" link: `href="/expenses/new"` → `href="/"`
+- "Done" button already correctly points to `/`
+
+### New Navigation Flow
+```
+/ (Landing - Expense Form)
+  ├─→ View Expenses → /expenses
+  ├─→ Cancel → /expenses
+  └─→ Submit → /expenses/new/success
+        ├─→ Add Another → /
+        └─→ Done → /
+
+/expenses (List View)
+  ├─→ Add Expense → /
+  └─→ Back to Home → /
+
+/expenses/new (Legacy Route)
+  └─→ Redirects to /
+```
+
+### Testing
+- ✅ TypeScript type check passed
+- ✅ Production build successful
+- ✅ All routes generated correctly
+- ✅ No changes to business logic, validation, or data operations
+
+### Files Modified
+- `src/app/page.tsx` - Replaced with expense form
+- `src/app/expenses/new/page.tsx` - Converted to redirect
+- `src/app/expenses/page.tsx` - Updated navigation links
+- `src/app/expenses/new/success/page.tsx` - Updated navigation links
+
+### Risk Assessment
+**Low Risk** - Pure routing/UX change with no modifications to:
+- Database schema or operations
+- API routes or validation logic
+- Google Sheets integration
+- Business logic or data processing
+
+### Rollback
+If needed, revert the 4 modified files to restore the original hub-and-spoke navigation pattern.
