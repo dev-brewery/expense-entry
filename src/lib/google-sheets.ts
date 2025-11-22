@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { formatDate } from './utils';
+import { retry } from './retry';
 
 // Type definitions
 export interface SheetExpense {
@@ -165,29 +166,40 @@ export async function insertExpenseToSheet(expense: {
   amount: number;
   categoryName: string;
 }): Promise<void> {
-  const sheets = getGoogleSheetsClient();
-  const spreadsheetId = getSpreadsheetId();
+  await retry(
+    async () => {
+      const sheets = getGoogleSheetsClient();
+      const spreadsheetId = getSpreadsheetId();
 
-  // Ensure the month sheet exists
-  const sheetName = await ensureMonthSheetExists(expense.date);
+      // Ensure the month sheet exists
+      const sheetName = await ensureMonthSheetExists(expense.date);
 
-  const row = [
-    expense.id,
-    formatDate(expense.date),
-    expense.description,
-    expense.amount,
-    expense.categoryName,
-  ];
+      const row = [
+        expense.id,
+        formatDate(expense.date),
+        expense.description,
+        expense.amount,
+        expense.categoryName,
+      ];
 
-  // Append to the month sheet (after the header and total rows)
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `'${sheetName}'!A3:E`,
-    valueInputOption: 'RAW',
-    requestBody: {
-      values: [row],
+      // Append to the month sheet (after the header and total rows)
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `'${sheetName}'!A3:E`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [row],
+        },
+      });
     },
-  });
+    {
+      maxAttempts: 3,
+      delayMs: 1000,
+      onRetry: (attempt, error) => {
+        console.log(`[Sheets] Insert attempt ${attempt} failed:`, error.message);
+      },
+    }
+  );
 }
 
 // Extended type that includes sheet location information
@@ -344,70 +356,81 @@ export async function updateExpenseInSheet(
     categoryName?: string;
   }
 ): Promise<void> {
-  const sheets = getGoogleSheetsClient();
-  const spreadsheetId = getSpreadsheetId();
+  await retry(
+    async () => {
+      const sheets = getGoogleSheetsClient();
+      const spreadsheetId = getSpreadsheetId();
 
-  // Get all month sheets
-  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-  const allSheets = spreadsheet.data.sheets || [];
-  const monthSheetPattern = /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
-  const monthSheets = allSheets
-    .filter(sheet => monthSheetPattern.test(sheet.properties?.title || ''))
-    .map(sheet => sheet.properties!.title!);
+      // Get all month sheets
+      const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+      const allSheets = spreadsheet.data.sheets || [];
+      const monthSheetPattern = /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
+      const monthSheets = allSheets
+        .filter(sheet => monthSheetPattern.test(sheet.properties?.title || ''))
+        .map(sheet => sheet.properties!.title!);
 
-  // Search for the expense across all month sheets
-  for (const sheetName of monthSheets) {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `'${sheetName}'!A3:E`,
-    });
+      // Search for the expense across all month sheets
+      for (const sheetName of monthSheets) {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `'${sheetName}'!A3:E`,
+        });
 
-    const rows = response.data.values || [];
-    const rowIndex = rows.findIndex(row => row[0] === id);
+        const rows = response.data.values || [];
+        const rowIndex = rows.findIndex(row => row[0] === id);
 
-    if (rowIndex !== -1) {
-      // Found the expense - update it
-      const currentRow = rows[rowIndex];
-      const updatedRow = [
-        currentRow[0], // ID stays the same
-        updates.date ? formatDate(updates.date) : currentRow[1],
-        updates.description ?? currentRow[2],
-        updates.amount ?? currentRow[3],
-        updates.categoryName ?? currentRow[4],
-      ];
+        if (rowIndex !== -1) {
+          // Found the expense - update it
+          const currentRow = rows[rowIndex];
+          const updatedRow = [
+            currentRow[0], // ID stays the same
+            updates.date ? formatDate(updates.date) : currentRow[1],
+            updates.description ?? currentRow[2],
+            updates.amount ?? currentRow[3],
+            updates.categoryName ?? currentRow[4],
+          ];
 
-      // If date changed and month changed, need to move to different sheet
-      if (updates.date) {
-        const newSheetName = getMonthSheetName(updates.date);
+          // If date changed and month changed, need to move to different sheet
+          if (updates.date) {
+            const newSheetName = getMonthSheetName(updates.date);
 
-        if (newSheetName !== sheetName) {
-          // Delete from current sheet and insert into new sheet
-          await deleteExpenseFromSheet(id);
-          await insertExpenseToSheet({
-            id: currentRow[0],
-            date: updates.date,
-            description: updates.description ?? currentRow[2],
-            amount: updates.amount ?? parseFloat(currentRow[3]),
-            categoryName: updates.categoryName ?? currentRow[4],
+            if (newSheetName !== sheetName) {
+              // Delete from current sheet and insert into new sheet
+              await deleteExpenseFromSheet(id);
+              await insertExpenseToSheet({
+                id: currentRow[0],
+                date: updates.date,
+                description: updates.description ?? currentRow[2],
+                amount: updates.amount ?? parseFloat(currentRow[3]),
+                categoryName: updates.categoryName ?? currentRow[4],
+              });
+              return;
+            }
+          }
+
+          // Update in the same sheet (rowIndex is 0-based, row 3 is index 0, so add 3)
+          await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `'${sheetName}'!A${rowIndex + 3}:E${rowIndex + 3}`,
+            valueInputOption: 'RAW',
+            requestBody: {
+              values: [updatedRow],
+            },
           });
           return;
         }
       }
 
-      // Update in the same sheet (rowIndex is 0-based, row 3 is index 0, so add 3)
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: `'${sheetName}'!A${rowIndex + 3}:E${rowIndex + 3}`,
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [updatedRow],
-        },
-      });
-      return;
+      throw new Error(`Expense with ID ${id} not found in Google Sheets`);
+    },
+    {
+      maxAttempts: 3,
+      delayMs: 1000,
+      onRetry: (attempt, error) => {
+        console.log(`[Sheets] Update attempt ${attempt} failed:`, error.message);
+      },
     }
-  }
-
-  throw new Error(`Expense with ID ${id} not found in Google Sheets`);
+  );
 }
 
 // Update the ID of a specific row in Google Sheets
@@ -436,50 +459,61 @@ export async function updateExpenseIdInSheet(
 
 // Delete an expense from Google Sheets (searches across all month sheets)
 export async function deleteExpenseFromSheet(id: string): Promise<void> {
-  const sheets = getGoogleSheetsClient();
-  const spreadsheetId = getSpreadsheetId();
+  await retry(
+    async () => {
+      const sheets = getGoogleSheetsClient();
+      const spreadsheetId = getSpreadsheetId();
 
-  // Get all month sheets
-  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-  const allSheets = spreadsheet.data.sheets || [];
-  const monthSheetPattern = /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
-  const monthSheets = allSheets.filter(sheet => monthSheetPattern.test(sheet.properties?.title || ''));
+      // Get all month sheets
+      const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+      const allSheets = spreadsheet.data.sheets || [];
+      const monthSheetPattern = /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
+      const monthSheets = allSheets.filter(sheet => monthSheetPattern.test(sheet.properties?.title || ''));
 
-  // Search for the expense across all month sheets
-  for (const sheet of monthSheets) {
-    const sheetName = sheet.properties!.title!;
-    const sheetId = sheet.properties!.sheetId!;
+      // Search for the expense across all month sheets
+      for (const sheet of monthSheets) {
+        const sheetName = sheet.properties!.title!;
+        const sheetId = sheet.properties!.sheetId!;
 
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `'${sheetName}'!A3:A`,
-    });
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `'${sheetName}'!A3:A`,
+        });
 
-    const rows = response.data.values || [];
-    const rowIndex = rows.findIndex(row => row[0] === id);
+        const rows = response.data.values || [];
+        const rowIndex = rows.findIndex(row => row[0] === id);
 
-    if (rowIndex !== -1) {
-      // Found the expense - delete it (row 3 is index 0, so add 3)
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        requestBody: {
-          requests: [
-            {
-              deleteDimension: {
-                range: {
-                  sheetId,
-                  dimension: 'ROWS',
-                  startIndex: rowIndex + 2, // +2 because rows 0 and 1 are header and total
-                  endIndex: rowIndex + 3,
+        if (rowIndex !== -1) {
+          // Found the expense - delete it (row 3 is index 0, so add 3)
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+              requests: [
+                {
+                  deleteDimension: {
+                    range: {
+                      sheetId,
+                      dimension: 'ROWS',
+                      startIndex: rowIndex + 2, // +2 because rows 0 and 1 are header and total
+                      endIndex: rowIndex + 3,
+                    },
+                  },
                 },
-              },
+              ],
             },
-          ],
-        },
-      });
-      return;
-    }
-  }
+          });
+          return;
+        }
+      }
 
-  throw new Error(`Expense with ID ${id} not found in Google Sheets`);
+      throw new Error(`Expense with ID ${id} not found in Google Sheets`);
+    },
+    {
+      maxAttempts: 3,
+      delayMs: 1000,
+      onRetry: (attempt, error) => {
+        console.log(`[Sheets] Delete attempt ${attempt} failed:`, error.message);
+      },
+    }
+  );
 }

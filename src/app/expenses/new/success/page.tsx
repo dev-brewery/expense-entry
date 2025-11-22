@@ -97,16 +97,24 @@ export default async function ExpenseSuccessPage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        <div className="flex gap-4">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              href="/"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors text-center"
+            >
+              Add Another
+            </Link>
+            <Link
+              href="/expenses"
+              className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 px-6 py-3 rounded-lg font-medium transition-colors text-center"
+            >
+              Expenses
+            </Link>
+          </div>
           <Link
-            href="/"
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors text-center"
-          >
-            Add Another
-          </Link>
-          <Link
-            href="/"
-            className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 px-6 py-3 rounded-lg font-medium transition-colors text-center"
+            href="/expenses/confirmed"
+            className="block w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors text-center"
           >
             Done
           </Link>
