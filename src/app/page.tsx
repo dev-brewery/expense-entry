@@ -1,17 +1,7 @@
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
 import { ExpenseForm } from '@/components/ExpenseForm'
 
-async function getCategories() {
-  return await prisma.category.findMany({
-    orderBy: {
-      name: 'asc',
-    },
-  })
-}
-
 export default async function Home() {
-  const categories = await getCategories()
   const today = new Date().toISOString().split('T')[0]
 
   return (
@@ -27,7 +17,7 @@ export default async function Home() {
           </Link>
         </div>
 
-        <ExpenseForm categories={categories} defaultDate={today} />
+        <ExpenseForm defaultDate={today} />
       </div>
     </div>
   )
