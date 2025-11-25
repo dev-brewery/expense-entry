@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { DeleteExpenseButton } from '@/components/DeleteExpenseButton'
 
 async function getExpenses() {
   return await prisma.expense.findMany({
@@ -30,7 +31,7 @@ export default async function ExpensesPage() {
             </p>
           </div>
           <Link
-            href="/expenses/new"
+            href="/"
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
           >
             Add Expense
@@ -43,14 +44,14 @@ export default async function ExpensesPage() {
               No expenses yet
             </p>
             <Link
-              href="/expenses/new"
+              href="/"
               className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
             >
               Create your first expense
             </Link>
           </div>
         ) : (
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -66,6 +67,9 @@ export default async function ExpensesPage() {
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Amount
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -101,6 +105,9 @@ export default async function ExpensesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
                         {formatCurrency(expense.amount)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                        <DeleteExpenseButton expenseId={expense.id} />
                       </td>
                     </tr>
                   ))}

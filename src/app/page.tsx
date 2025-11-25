@@ -1,38 +1,34 @@
 import Link from 'next/link'
+import { prisma } from '@/lib/prisma'
+import { ExpenseForm } from '@/components/ExpenseForm'
 
-export default function Home() {
+async function getCategories() {
+  return await prisma.category.findMany({
+    orderBy: {
+      name: 'asc',
+    },
+  })
+}
+
+export default async function Home() {
+  const categories = await getCategories()
+  const today = new Date().toISOString().split('T')[0]
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8">
-      <div className="max-w-2xl w-full space-y-8">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Expense Entry</h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            Track and manage your expenses efficiently
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
+    <div className="min-h-screen p-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Add New Expense</h1>
           <Link
             href="/expenses"
-            className="p-6 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
-            <h2 className="text-2xl font-semibold mb-2">View Expenses →</h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Browse and manage your expense records
-            </p>
-          </Link>
-
-          <Link
-            href="/expenses/new"
-            className="p-6 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
-          >
-            <h2 className="text-2xl font-semibold mb-2">Add Expense →</h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Create a new expense entry
-            </p>
+            View Expenses →
           </Link>
         </div>
+
+        <ExpenseForm categories={categories} defaultDate={today} />
       </div>
-    </main>
+    </div>
   )
 }

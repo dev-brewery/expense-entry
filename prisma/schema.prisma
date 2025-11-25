@@ -34,3 +34,22 @@ model Expense {
   @@index([date])
   @@index([categoryId])
 }
+
+model ExpenseAuditRecords {
+  id            String   @id @default(cuid())
+  expenseId     String   // Original expense UUID from Sheets
+  amount        Float
+  description   String
+  date          DateTime
+  categoryId    String
+  categoryName  String   // Denormalized for restoration
+  categoryColor String   // Denormalized for restoration
+  sheetName     String   // e.g., "June 2025"
+  rowIndex      Int      // 0-based row index in sheet
+  deletedAt     DateTime @default(now())
+  restoredAt    DateTime?
+
+  @@index([expenseId])
+  @@index([deletedAt])
+  @@index([expenseId, restoredAt]) // Fast lookup for unrestored items
+}

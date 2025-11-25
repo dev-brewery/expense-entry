@@ -1,6 +1,43 @@
 import { prisma } from './prisma';
 import { getExpensesFromSheet, updateExpenseIdInSheet, SheetExpenseWithLocation } from './google-sheets';
 import { randomBytes } from 'crypto';
+import { ExpenseAuditRecords } from '@prisma/client';
+
+/**
+ * Restores an expense from the audit log
+ * Called when an expense is found in Google Sheets but not in PostgreSQL,
+ * and a matching unrestored audit record exists
+ */
+async function restoreExpenseFromAudit(
+  expenseId: string,
+  auditRecord: ExpenseAuditRecords
+): Promise<void> {
+  console.log(`[Sync] Restoring expense ${expenseId} from audit log`);
+
+  try {
+    // Recreate expense in PostgreSQL with original UUID
+    await prisma.expense.create({
+      data: {
+        id: auditRecord.expenseId,
+        amount: auditRecord.amount,
+        description: auditRecord.description,
+        date: auditRecord.date,
+        categoryId: auditRecord.categoryId,
+      },
+    });
+
+    // Mark audit record as restored
+    await prisma.expenseAuditRecords.update({
+      where: { id: auditRecord.id },
+      data: { restoredAt: new Date() },
+    });
+
+    console.log(`[Sync] Successfully restored expense ${expenseId}`);
+  } catch (error) {
+    console.error(`[Sync] Failed to restore expense ${expenseId}:`, error);
+    throw error;
+  }
+}
 
 /**
  * Syncs expenses from Google Sheets to PostgreSQL
@@ -30,6 +67,24 @@ export async function syncExpensesFromSheets(): Promise<{
     });
     const existingIds = new Set(existingExpenses.map((e) => e.id));
     console.log(`[Sync] Found ${existingIds.size} expenses in PostgreSQL`);
+
+    // Batch fetch audit records for performance optimization
+    const sheetExpenseIds = sheetExpenses
+      .map(e => e.id)
+      .filter(id => id && id.trim() !== '');
+
+    const auditRecords = await prisma.expenseAuditRecords.findMany({
+      where: {
+        expenseId: { in: sheetExpenseIds },
+        restoredAt: null, // Only unrestored deletions
+      },
+    });
+
+    // Create a Map for O(1) lookup
+    const auditMap = new Map(
+      auditRecords.map(record => [record.expenseId, record])
+    );
+    console.log(`[Sync] Found ${auditRecords.length} unrestored audit records`);
 
     let synced = 0;
     const errors: string[] = [];
@@ -61,6 +116,16 @@ export async function syncExpensesFromSheets(): Promise<{
         } else if (existingIds.has(expenseId)) {
           // Expense already exists in PostgreSQL
           continue;
+        } else {
+          // Expense has an ID but not in PostgreSQL - check audit log
+          const auditRecord = auditMap.get(expenseId);
+          if (auditRecord) {
+            // Restore from audit log
+            await restoreExpenseFromAudit(expenseId, auditRecord);
+            synced++;
+            continue;
+          }
+          // Not in PostgreSQL and not in audit log - will create as new below
         }
 
         // First, ensure the category exists

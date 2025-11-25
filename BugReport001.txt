@@ -1,0 +1,48 @@
+Bug: Adding expense for another month returns as if it is for current month, and returns current month total.
+
+http://localhost:3000/expenses/new/success?categoryId=cmi4qc9th0000e2xtvzckh62m&month=11&year=2025
+
+Correct Behavior: If an expense is added for November, it should return the total for that category for the month of November. If an expense is added for December, it should return the total for that category ONLY for the month of December.
+
+---
+
+FIX Required:
+
+Root Cause:
+- Date timezone mismatch between form parsing and database storage
+- Form dates like "2025-12-01" were parsed as UTC midnight (2025-12-01T00:00:00Z)
+- In PST timezone (UTC-8), UTC midnight = November 30th 4:00 PM local time
+- This causes dates to shift backward by one day, making December 1st appear as November 30th
+- Month extraction then returns November instead of December
+
+Changes To Be Made:
+1. src/app/expenses/new/page.tsx (lines 17-20)
+   - Change date parsing from new Date("2025-12-01") to new Date(2025, 11, 1)
+   - Parse form dates as local midnight instead of UTC midnight
+   - Preserve user's intended date regardless of timezone
+
+2. Add clarifying comments about timezone handling in both files
+
+Verification:
+- Create test expense for December 1st, 2025 with $30 amount
+- Confirm date displays as December 1st (not November 30th)
+- Confirm success page shows December monthly total (not November)
+
+---
+
+FIX APPLIED (2025-11-21):
+
+Changes Made:
+1. src/app/expenses/new/page.tsx (lines 17-22)
+   - Replaced: new Date(formData.get('date') as string)
+   - With: Parse date components individually and construct local Date
+   - Implementation:
+     * Split date string "YYYY-MM-DD" into [year, month, day] components
+     * Create Date using: new Date(dateYear, dateMonth - 1, dateDay)
+     * This ensures local midnight instead of UTC midnight
+   - Added clarifying comments about timezone handling
+
+Status: ✅ FIXED
+- TypeScript type check: PASSED
+- ESLint: PASSED
+- Ready for manual testing per verification steps above
