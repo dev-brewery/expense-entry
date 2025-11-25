@@ -24,8 +24,18 @@ function getGoogleSheetsClient() {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_CREDENTIALS environment variable is not set');
   }
 
+  let parsedCredentials;
+  try {
+    parsedCredentials = JSON.parse(credentials);
+  } catch (error) {
+    throw new Error(
+      `Failed to parse GOOGLE_SERVICE_ACCOUNT_CREDENTIALS. ` +
+      `Ensure it contains valid JSON. Error: ${(error as Error).message}`
+    );
+  }
+
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(credentials),
+    credentials: parsedCredentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
