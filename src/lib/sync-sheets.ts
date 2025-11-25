@@ -2,6 +2,7 @@ import { prisma } from './prisma';
 import { getExpensesFromSheet, updateExpenseIdInSheet, SheetExpenseWithLocation } from './google-sheets';
 import { randomBytes } from 'crypto';
 import { ExpenseAuditRecords } from '@prisma/client';
+import { logger } from './logger';
 
 /**
  * Restores an expense from the audit log
@@ -12,7 +13,7 @@ async function restoreExpenseFromAudit(
   expenseId: string,
   auditRecord: ExpenseAuditRecords
 ): Promise<void> {
-  console.log(`[Sync] Restoring expense ${expenseId} from audit log`);
+  logger.debug(`Restoring expense ${expenseId} from audit log`);
 
   try {
     // Recreate expense in PostgreSQL with original UUID
@@ -32,9 +33,9 @@ async function restoreExpenseFromAudit(
       data: { restoredAt: new Date() },
     });
 
-    console.log(`[Sync] Successfully restored expense ${expenseId}`);
+    logger.info(`Successfully restored expense ${expenseId}`);
   } catch (error) {
-    console.error(`[Sync] Failed to restore expense ${expenseId}:`, error);
+    logger.error(`Failed to restore expense ${expenseId}`, error);
     throw error;
   }
 }
@@ -49,11 +50,11 @@ export async function syncExpensesFromSheets(): Promise<{
   errors: string[];
 }> {
   try {
-    console.log('[Sync] Starting sync from Google Sheets to PostgreSQL...');
+    logger.info('Starting sync from Google Sheets to PostgreSQL...');
 
     // Get all expenses from Google Sheets with location info
     const sheetExpenses = await getExpensesFromSheet({ includeLocation: true }) as SheetExpenseWithLocation[];
-    console.log(`[Sync] Found ${sheetExpenses.length} expenses in Google Sheets`);
+    logger.info(`Found ${sheetExpenses.length} expenses in Google Sheets`);
 
     // Get all expenses from PostgreSQL for duplicate checking
     const existingExpenses = await prisma.expense.findMany({
@@ -66,7 +67,7 @@ export async function syncExpensesFromSheets(): Promise<{
       },
     });
     const existingIds = new Set(existingExpenses.map((e) => e.id));
-    console.log(`[Sync] Found ${existingIds.size} expenses in PostgreSQL`);
+    logger.info(`Found ${existingIds.size} expenses in PostgreSQL`);
 
     // Batch fetch audit records for performance optimization
     const sheetExpenseIds = sheetExpenses
@@ -84,7 +85,7 @@ export async function syncExpensesFromSheets(): Promise<{
     const auditMap = new Map(
       auditRecords.map(record => [record.expenseId, record])
     );
-    console.log(`[Sync] Found ${auditRecords.length} unrestored audit records`);
+    logger.info(`Found ${auditRecords.length} unrestored audit records`);
 
     let synced = 0;
     const errors: string[] = [];
@@ -105,14 +106,14 @@ export async function syncExpensesFromSheets(): Promise<{
           );
 
           if (duplicate) {
-            console.log(`[Sync] Skipping duplicate expense: ${expense.description}`);
+            logger.debug(`Skipping duplicate expense: ${expense.description}`);
             continue;
           }
 
           // Generate new ID for this expense
           expenseId = randomBytes(12).toString('base64url');
           needsIdUpdate = true;
-          console.log(`[Sync] Generated new ID for expense without ID: ${expenseId}`);
+          logger.info(`Generated new ID for expense without ID: ${expenseId}`);
         } else if (existingIds.has(expenseId)) {
           // Expense already exists in PostgreSQL
           continue;
@@ -143,7 +144,7 @@ export async function syncExpensesFromSheets(): Promise<{
               color: '#6B7280', // Default gray color
             },
           });
-          console.log(`[Sync] Created new category: ${categoryName}`);
+          logger.info(`Created new category: ${categoryName}`);
         }
 
         // Create the expense in PostgreSQL
@@ -160,23 +161,23 @@ export async function syncExpensesFromSheets(): Promise<{
         // If we generated a new ID, write it back to Google Sheets
         if (needsIdUpdate && expense._sheetName && expense._rowIndex !== undefined) {
           await updateExpenseIdInSheet(expense._sheetName, expense._rowIndex, expenseId);
-          console.log(`[Sync] Updated Google Sheet with new ID: ${expenseId}`);
+          logger.info(`Updated Google Sheet with new ID: ${expenseId}`);
         }
 
         synced++;
-        console.log(`[Sync] Synced expense ${expenseId}: ${expense.description}`);
+        logger.info(`Synced expense ${expenseId}: ${expense.description}`);
       } catch (error) {
         const errorMsg = `Failed to sync expense ${expense.id}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        console.error(`[Sync] ${errorMsg}`);
+        logger.error(errorMsg);
         errors.push(errorMsg);
       }
     }
 
-    console.log(`[Sync] Sync complete. Synced ${synced} expenses, ${errors.length} errors`);
+    logger.info(`Sync complete. Synced ${synced} expenses, ${errors.length} errors`);
 
     return { synced, errors };
   } catch (error) {
-    console.error('[Sync] Failed to sync expenses from Google Sheets:', error);
+    logger.error('Failed to sync expenses from Google Sheets', error);
     throw error;
   }
 }
@@ -194,7 +195,7 @@ export async function isSyncNeeded(): Promise<boolean> {
 
     return sheetExpenses.length > dbCount;
   } catch (error) {
-    console.error('[Sync] Error checking if sync is needed:', error);
+    logger.error('Error checking if sync is needed', error);
     return false;
   }
 }

@@ -2,6 +2,8 @@
  * Retry utility with exponential backoff
  */
 
+import { logger } from './logger';
+
 export interface RetryOptions {
   maxAttempts?: number;
   delayMs?: number;
@@ -54,7 +56,7 @@ export async function retry<T>(
 
       // Wait with exponential backoff
       const delay = delayMs * Math.pow(backoffFactor, attempt - 1);
-      console.log(`[Retry] Attempt ${attempt}/${maxAttempts} failed, retrying in ${delay}ms...`);
+      logger.debug(`Attempt ${attempt}/${maxAttempts} failed, retrying in ${delay}ms...`);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
