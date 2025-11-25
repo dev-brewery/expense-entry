@@ -14,15 +14,15 @@
 This plan prepares the expense-entry application for production deployment as version 1.0. Based on comprehensive Gemini analysis, the application is currently 70% production-ready. This plan addresses all critical issues, adds simple cookie-based authentication, and provides complete Docker containerization for Unraid deployment.
 
 **Key Changes:**
-- ✅ Create production-ready Dockerfile with multi-stage build
-- ✅ Add simple cookie-based authentication (shared passcode)
-- ✅ Fix Next.js configuration for Docker deployment
-- ✅ Implement environment validation and error handling
-- ✅ Create Unraid-specific docker-compose.yml for `proxynet`
-- ✅ Add health check endpoint
-- ✅ Replace console.log with production-safe logging
-- ✅ Configure bind mounts to `/mnt/user/appdata/expense-entry/`
-- ✅ Set version to 1.0.0 in package.json
+- [ ] Create production-ready Dockerfile with multi-stage build
+- [ ] Add simple cookie-based authentication (shared passcode)
+- [x] Fix Next.js configuration for Docker deployment
+- [x] Implement environment validation and error handling
+- [ ] Create Unraid-specific docker-compose.yml for `proxynet`
+- [x] Add health check endpoint
+- [x] Replace console.log with production-safe logging
+- [ ] Configure bind mounts to `/mnt/user/appdata/expense-entry/`
+- [x] Set version to 1.0.0 in package.json
 
 ---
 
