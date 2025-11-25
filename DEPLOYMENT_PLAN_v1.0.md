@@ -850,7 +850,7 @@ LOG_LEVEL=error
 - [ ] Run `npm run lint` - fix any linting issues
 - [ ] Run `npm test` - ensure tests pass
 - [ ] Run `npm audit` - check for security vulnerabilities
-- [ ] Update package.json version to `1.0.0`
+- [x] Update package.json version to `1.0.0`
 - [ ] Commit all changes
 - [ ] Create git tag: `git tag -a v1.0.0 -m "Release version 1.0.0"`
 - [ ] Push to repository: `git push && git push --tags`
