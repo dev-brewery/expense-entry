@@ -30,13 +30,22 @@ export default async function ExpensesPage() {
               Total: {formatCurrency(totalAmount)}
             </p>
           </div>
-          <Link
-            href="/"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            Add Expense
-          </Link>
+          <div className="flex gap-4">
+            <Link
+              href="/categories"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Manage Categories
+            </Link>
+            <Link
+              href="/"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Add Expense
+            </Link>
+          </div>
         </div>
+
 
         {expenses.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg">

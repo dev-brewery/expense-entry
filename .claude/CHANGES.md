@@ -1087,3 +1087,16 @@ See `DELETE_FEATURE_TESTING.md` for complete test suite covering:
 4. Optional: Add "View Deleted Expenses" UI for manual restoration
 
 ---
+
+## 2025-11-25
+- Fixed timezone discrepancy bug in expense entry.
+- Dates are now constructed using the local timezone to ensure they are stored and displayed correctly.
+
+- Refactored category management to dedicated /categories page.
+- Removed CategoryManager component from /expenses page and added 'Manage Categories' link.
+
+- Fixed category dropdown styling issues - replaced undefined CSS variables with proper RGB values for better legibility and contrast.
+
+- Updated categories page layout to have Create Category and View Expenses buttons side-by-side.
+- Fixed category dropdown refresh issue - ExpenseForm now fetches categories on mount to show newly created categories.
+- Added auto-focus to Name field in Create Category modal for better UX.
