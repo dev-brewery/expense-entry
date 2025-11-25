@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { logger } from '@/lib/logger';
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const LAST_SYNC_KEY = 'expense-tracker-last-sync';
@@ -11,18 +12,18 @@ export function SyncChecker() {
 
   useEffect(() => {
     async function checkAndSync() {
-      console.log('[SyncChecker] Component mounted, starting sync check...');
+      logger.debug('Component mounted, starting sync check...');
       try {
         // Check if enough time has passed since last sync
         const lastSyncTime = localStorage.getItem(LAST_SYNC_KEY);
         const now = Date.now();
-        console.log('[SyncChecker] Last sync timestamp:', lastSyncTime);
+        logger.debug('Last sync timestamp:', lastSyncTime);
 
         if (lastSyncTime) {
           const timeSinceLastSync = now - parseInt(lastSyncTime, 10);
           if (timeSinceLastSync < SYNC_INTERVAL_MS) {
-            console.log(
-              `[SyncChecker] Skipping sync, last sync was ${Math.round(timeSinceLastSync / 1000)}s ago`
+            logger.debug(
+              `Skipping sync, last sync was ${Math.round(timeSinceLastSync / 1000)}s ago`
             );
             return;
           }
@@ -33,7 +34,7 @@ export function SyncChecker() {
         const { syncNeeded } = await checkResponse.json();
 
         if (syncNeeded) {
-          console.log('[SyncChecker] Sync needed, triggering sync...');
+          logger.info('Sync needed, triggering sync...');
           setSyncing(true);
 
           // Trigger sync
@@ -42,7 +43,7 @@ export function SyncChecker() {
 
           if (result.success && result.synced > 0) {
             setSyncResult({ synced: result.synced });
-            console.log(`[SyncChecker] Synced ${result.synced} expenses from Google Sheets`);
+            logger.info(`Synced ${result.synced} expenses from Google Sheets`);
           }
 
           setSyncing(false);
@@ -50,10 +51,10 @@ export function SyncChecker() {
 
         // Update last sync timestamp
         localStorage.setItem(LAST_SYNC_KEY, now.toString());
-        console.log('[SyncChecker] Sync check complete');
+        logger.debug('Sync check complete');
       } catch (error) {
-        console.error('[SyncChecker] Error during sync:', error);
-        console.error('[SyncChecker] Error details:', error instanceof Error ? error.message : String(error));
+        logger.error('Error during sync', error);
+        logger.error('Error details:', error instanceof Error ? error.message : String(error));
         setSyncing(false);
       }
     }
