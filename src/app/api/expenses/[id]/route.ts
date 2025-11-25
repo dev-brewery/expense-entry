@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { updateExpenseSchema } from '@/lib/validations/expense'
 import { RetryableError } from '@/lib/retry'
+import { getSheetNameFromDate } from '@/lib/utils'
 
 export async function GET(
   _request: Request,
@@ -139,60 +140,72 @@ export async function DELETE(
   _request: Request,
   { params }: { params: { id: string } }
 ) {
+  const { id } = params
+  let auditRecordId: string | null = null
+
   try {
-    // Get the expense data BEFORE deleting (for rollback)
-    const oldExpense = await prisma.expense.findUnique({
-      where: { id: params.id },
-      include: {
-        category: true,
-      },
+    // 1. Fetch expense with category for audit record
+    const expense = await prisma.expense.findUnique({
+      where: { id },
+      include: { category: true },
     })
 
-    if (!oldExpense) {
+    if (!expense) {
       return NextResponse.json(
         { error: 'Expense not found' },
         { status: 404 }
       )
     }
 
-    // Delete from PostgreSQL
-    await prisma.expense.delete({
-      where: { id: params.id },
+    // 2. Create audit record BEFORE deletion
+    // This provides recovery mechanism if expense is manually restored to Sheets
+    const sheetName = getSheetNameFromDate(expense.date)
+    const auditRecord = await prisma.expenseAuditRecords.create({
+      data: {
+        expenseId: expense.id,
+        amount: expense.amount,
+        description: expense.description,
+        date: expense.date,
+        categoryId: expense.categoryId,
+        categoryName: expense.category.name,
+        categoryColor: expense.category.color || '#6B7280',
+        sheetName: sheetName,
+        rowIndex: 0, // Exact row index not critical for restoration
+      },
     })
+    auditRecordId = auditRecord.id
 
-    // Delete from Google Sheets (primary data store)
-    // If this fails, rollback by recreating the expense in PostgreSQL
+    // 3. Delete from PostgreSQL
     try {
-      const { deleteExpenseFromSheet } = await import('@/lib/google-sheets')
-      await deleteExpenseFromSheet(params.id)
-    } catch (sheetsError) {
-      console.error('Failed to delete from Google Sheets, rolling back PostgreSQL entry:', sheetsError)
-
-      // Rollback: Recreate the expense in PostgreSQL
-      try {
-        await prisma.expense.create({
-          data: {
-            id: oldExpense.id,
-            date: oldExpense.date,
-            description: oldExpense.description,
-            amount: oldExpense.amount,
-            categoryId: oldExpense.categoryId,
-            notes: oldExpense.notes,
-          },
+      await prisma.expense.delete({
+        where: { id },
+      })
+    } catch (deleteError) {
+      // Rollback: Delete audit record if PostgreSQL delete fails
+      if (auditRecordId) {
+        await prisma.expenseAuditRecords.delete({
+          where: { id: auditRecordId },
         })
-        console.log(`Rollback successful: Recreated expense ${params.id} in PostgreSQL`)
-      } catch (rollbackError) {
-        console.error('CRITICAL: Rollback failed! Data inconsistency detected:', rollbackError)
       }
-
-      // Re-throw the original error
-      throw sheetsError
+      throw deleteError
     }
+
+    // 4. Delete from Google Sheets (async, best effort)
+    // We don't rollback on Sheets failure because:
+    // - Audit log provides recovery mechanism
+    // - If expense remains in Sheets, next sync will restore it from audit
+    // - This prevents data inconsistency (PostgreSQL having data Sheets doesn't)
+    const { deleteExpenseFromSheet } = await import('@/lib/google-sheets')
+    deleteExpenseFromSheet(id).catch(error => {
+      console.error(`[DELETE] Sheets deletion failed for ${id}:`, error)
+      // Don't rollback - audit log allows recovery
+    })
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
     console.error('Error deleting expense:', error)
 
+    // Add RetryableError handling from dev branch
     if (error instanceof RetryableError) {
       return NextResponse.json(
         {

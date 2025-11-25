@@ -818,3 +818,272 @@ npm run type-check
 
 ### Priority
 **Medium** - Quality-of-life improvement for user experience
+
+## 2025-11-22: Delete Expense Feature with Audit Log
+
+### Phase 1: Foundation (Database & Configuration)
+
+#### Task 1: Database Schema - ExpenseAuditRecords Model ✓ COMPLETE
+
+**Objective**: Add audit logging table to track deleted expenses for restoration.
+
+**Changes**:
+- Added `ExpenseAuditRecords` model to `prisma/schema.prisma`
+- Fields: id, expenseId, amount, description, date, categoryId, categoryName, categoryColor, sheetName, rowIndex, deletedAt, restoredAt
+- Created three indexes for performance:
+  - `@@index([expenseId])` - Fast lookup by expense ID
+  - `@@index([deletedAt])` - Fast cleanup queries
+  - `@@index([expenseId, restoredAt])` - Optimized for finding unrestored deletions
+
+**Files Modified**:
+- `prisma/schema.prisma`: Added ExpenseAuditRecords model with indexes
+- Regenerated Prisma client: `npm run db:generate`
+- Applied schema to database: `npm run db:push`
+
+**Verification**: Created and tested CRUD operations on ExpenseAuditRecords table successfully.
+
+#### Task 2: Environment Configuration ✓ COMPLETE
+
+**Objective**: Add configuration for audit log retention period.
+
+**Changes**:
+- Added `AUDIT_RETENTION_DAYS=180` (6 months default) to `.env.example`
+- Added `AUDIT_RETENTION_DAYS=180` to `.env`
+
+**Files Modified**:
+- `.env.example`: Added AUDIT_RETENTION_DAYS configuration
+- `.env`: Added AUDIT_RETENTION_DAYS configuration
+
+#### Task 3: Validation Schema ✓ COMPLETE
+
+**Objective**: Create Zod validation schema for audit record creation.
+
+**Changes**:
+- Created `src/lib/validations/audit.ts`
+- Defined `createAuditRecordSchema` with all required fields
+- Exported `CreateAuditRecord` type for type safety
+
+**Files Created**:
+- `src/lib/validations/audit.ts`: Zod schema for audit records
+
+#### Task 4: Utility Functions ✓ COMPLETE
+
+**Objective**: Add helper functions for sheet name generation and row index calculation.
+
+**Changes**:
+- Added `getSheetNameFromDate()` - Converts Date to sheet name format (e.g., "June 2025")
+- Added `calculateSheetRowIndex()` - Calculates estimated row index based on date ordering
+
+**Files Modified**:
+- `src/lib/utils.ts`: Added two utility functions for audit record creation
+
+---
+
+### Phase 1 Complete!
+
+All foundation tasks completed:
+- Database schema with ExpenseAuditRecords model
+- Environment configuration for retention period
+- Validation schema for audit records
+- Utility functions for sheet operations
+
+**Next**: Phase 2 - Backend Logic (Sync Service & DELETE API)
+
+---
+
+### Phase 2: Backend Logic
+
+#### Task 5: Sync Service Modifications ✓ COMPLETE
+
+**Objective**: Add automatic restoration logic to sync service - when an expense is found in Google Sheets but not in PostgreSQL, check audit log before generating new UUID.
+
+**Changes**:
+- Added `restoreExpenseFromAudit()` function to recreate deleted expenses from audit records
+- Batch fetch audit records at start of sync for performance (avoid N+1 queries)
+- Modified main sync loop to check audit log before generating new UUIDs
+- When audit record found: Restore expense with original UUID and mark audit record as restored
+- When not in audit: Continue with existing behavior (generate new UUID)
+
+**Implementation Details**:
+- Batch query: `WHERE expenseId IN (...) AND restoredAt IS NULL`
+- Uses Map for O(1) audit record lookup
+- Restoration creates expense with original categoryId (category must exist)
+- Sets `restoredAt` timestamp on audit record
+
+**Files Modified**:
+- `src/lib/sync-sheets.ts`: Added restoration logic with batched audit lookups
+
+#### Task 6: DELETE API Enhancement ✓ COMPLETE
+
+**Objective**: Modify DELETE endpoint to create audit records before deletion with proper rollback handling and RetryableError support.
+
+**Enhanced Flow**:
+1. Fetch expense with category data (for audit record)
+2. Create audit record in `ExpenseAuditRecords` table
+3. Delete from PostgreSQL (with rollback if fails)
+4. Delete from Google Sheets asynchronously (don't block response)
+5. Return 204 success immediately
+
+**Rollback Strategy**:
+- If audit creation fails: Abort, don't delete
+- If PostgreSQL delete fails: Delete audit record, return error
+- If Sheets delete fails: Log error but don't rollback (audit allows restoration)
+- Support RetryableError for proper user feedback
+
+**Implementation Details**:
+- Uses `getSheetNameFromDate()` utility to determine sheet name
+- Stores category color with fallback to default (#6B7280)
+- Async Sheets deletion doesn't block API response
+- Audit record allows future restoration via sync
+- Returns 503 Service Unavailable for RetryableError
+
+**Files Modified**:
+- `src/app/api/expenses/[id]/route.ts`: Enhanced DELETE handler with audit logging and RetryableError handling
+
+---
+
+### Phase 2 Complete!
+
+All backend logic implemented:
+- Sync service automatically restores from audit log
+- DELETE API creates audit records with rollback protection
+- Google Sheets deletion handled asynchronously
+- RetryableError support for proper user feedback
+
+**Next**: Phase 3 - UI Integration (DeleteExpenseButton component)
+
+---
+
+### Phase 3: UI Integration
+
+#### Task 7: Delete Expense UI ✓ COMPLETE
+
+**Objective**: Add delete functionality to the expenses table with a dropdown menu.
+
+**Implementation**:
+- Created `DeleteExpenseButton` client component with dropdown menu
+- Three-dot vertical ellipsis button triggers dropdown
+- Dropdown contains single "Delete" action
+- Confirmation dialog before deletion
+- Shows "Deleting..." state during operation
+- Auto-refreshes page after successful deletion
+
+**UI Details**:
+- Ellipsis button: Gray text, darker on hover
+- Dropdown: Positioned right-aligned below button
+- Backdrop: Closes dropdown when clicking outside
+- Delete button: Red text, light red background on hover
+- Dark mode support throughout
+
+**User Flow**:
+1. Click three-dot menu on expense row
+2. Click "Delete" in dropdown
+3. Confirm deletion in browser alert
+4. Expense deleted from both PostgreSQL and Google Sheets
+5. Page refreshes to show updated list
+
+**Files Created**:
+- `src/components/DeleteExpenseButton.tsx`: Client-side delete component with dropdown UI
+
+**Files Modified**:
+- `src/app/expenses/page.tsx`: Added Actions column and DeleteExpenseButton to table
+
+---
+
+### Phase 3 Complete!
+
+UI integration finished:
+- DeleteExpenseButton component with clean dropdown design
+- Integrated into expenses table
+- Proper loading states and error handling
+
+**Next**: Phase 4 - Manual Testing
+
+---
+
+## 2025-11-25: Bug Fix - Dropdown Menu Clipping
+
+### Issue
+The Delete action dropdown menu was being clipped and hidden when there was only one expense visible on the screen. The dropdown would extend below the table container but was cut off by the parent's `overflow-hidden` CSS class.
+
+### Root Cause
+In `src/app/expenses/page.tsx:54`, the table container div had `overflow-hidden` class which prevented any absolutely positioned child elements (like the dropdown menu) from rendering outside its boundaries.
+
+### Solution
+Removed the `overflow-hidden` class from the outer table container div while keeping `overflow-x-auto` on the inner table wrapper. This allows:
+- The dropdown menu to render beyond container boundaries (fixing the clipping issue)
+- Horizontal scrolling to remain functional for wide tables
+- Proper z-index layering for the dropdown to appear above other content
+- Rounded corners to remain intact on the table container
+
+### Files Modified
+- `src/app/expenses/page.tsx`: Removed `overflow-hidden` from line 54
+
+### Testing Performed
+- TypeScript type checking passed
+- Dropdown now appears correctly with only 1 expense on screen
+- Dropdown continues to work with multiple expenses
+- Table styling (rounded corners, borders) remains intact
+
+## Implementation Summary - Delete Feature Complete
+
+### Feature Complete: Delete Expense with Audit Log & Restoration
+
+**What was built:**
+A complete delete feature that removes expenses from both PostgreSQL and Google Sheets while maintaining an audit trail for automatic restoration.
+
+**Key Capabilities:**
+1. **Delete with Audit**: Every deletion creates an audit record before removing data
+2. **Automatic Restoration**: If an expense is manually re-added to Google Sheets, it's automatically restored from the audit log with its original UUID
+3. **Rollback Protection**: If PostgreSQL delete fails, audit record is removed (transaction safety)
+4. **Performance Optimized**: Batched audit queries prevent N+1 database lookups during sync
+5. **Clean UI**: Three-dot dropdown menu with confirmation dialog
+6. **RetryableError Support**: Proper error handling with retry feedback
+
+**Architecture Decisions:**
+- **Two-phase deletion**: Delete PostgreSQL first (with audit), then Sheets async
+- **Audit in PostgreSQL only**: Google Sheets has native version history
+- **No restoration UI needed**: Sync handles it automatically
+- **UUID replacement for new entries**: If expense not in PostgreSQL or audit, generate new UUID
+
+**Files Created:**
+1. `src/lib/validations/audit.ts` - Zod schema for audit records
+2. `src/components/DeleteExpenseButton.tsx` - Client-side delete UI component
+3. `DELETE_FEATURE_TESTING.md` - Comprehensive testing guide
+4. `verify-audit-table.js` - Database verification script (can be deleted)
+
+**Files Modified:**
+1. `prisma/schema.prisma` - Added ExpenseAuditRecords model with 3 indexes
+2. `.env` & `.env.example` - Added AUDIT_RETENTION_DAYS configuration
+3. `src/lib/utils.ts` - Added getSheetNameFromDate() and calculateSheetRowIndex()
+4. `src/lib/sync-sheets.ts` - Added restoration logic with batched audit lookups
+5. `src/app/api/expenses/[id]/route.ts` - Enhanced DELETE with audit logging and RetryableError
+6. `src/app/expenses/page.tsx` - Added Actions column with DeleteExpenseButton, fixed dropdown clipping
+
+**Database Changes:**
+- New table: `ExpenseAuditRecords` with fields:
+  - id, expenseId, amount, description, date
+  - categoryId, categoryName, categoryColor
+  - sheetName, rowIndex
+  - deletedAt, restoredAt
+- Indexes for performance:
+  - expenseId (fast lookup during sync)
+  - deletedAt (fast cleanup queries)
+  - (expenseId, restoredAt) composite (optimized for unrestored lookups)
+
+**Testing:**
+See `DELETE_FEATURE_TESTING.md` for complete test suite covering:
+- Delete flow (happy path)
+- Restoration flow (audit log recovery)
+- New expense flow (UUID replacement)
+- Edge cases (multiple delete/restore, API failures, duplicates)
+- UI behavior (dropdown, confirmation, loading states)
+- Performance and data integrity tests
+
+**Next Steps (Future Enhancements):**
+1. Implement automated cleanup job for old audit records (Section 8 of plan)
+2. Add API endpoint: `/api/admin/cleanup-audit`
+3. Set up cron job to call cleanup endpoint weekly/monthly
+4. Optional: Add "View Deleted Expenses" UI for manual restoration
+
+---
