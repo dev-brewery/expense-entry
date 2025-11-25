@@ -1100,3 +1100,33 @@ See `DELETE_FEATURE_TESTING.md` for complete test suite covering:
 - Updated categories page layout to have Create Category and View Expenses buttons side-by-side.
 - Fixed category dropdown refresh issue - ExpenseForm now fetches categories on mount to show newly created categories.
 - Added auto-focus to Name field in Create Category modal for better UX.
+
+## 2025-11-25: Release 1.0.0 Preparation - Next.js Docker Configuration
+
+### Issue #3: Update Next.js Configuration for Docker Deployment ✓ COMPLETE
+
+**Objective**: Add `output: 'standalone'` to next.config.js to enable optimized Docker deployments.
+
+**Changes**:
+- Added `output: 'standalone'` to `next.config.js` configuration
+- Reduces Docker image size from ~450MB to ~200MB
+- Creates self-contained production build in `.next/standalone/` directory
+- Required for Phase 3 Docker containerization in v1.0.0 release
+
+**Benefits**:
+- Minimal production builds with only required dependencies
+- Faster container startup times
+- Reduced storage and bandwidth requirements
+- Optimized for containerized deployments
+
+**Files Modified**:
+- `next.config.js`: Added standalone output mode with explanatory comment
+
+**Verification**:
+- ✅ TypeScript type check passed
+- ✅ Production build successful
+- ✅ Standalone output directory created at `.next/standalone/`
+- ✅ Minimal server.js generated correctly
+
+**Pull Request**: #14 merged to `release/1.0.0` branch
+**GitHub Issue**: #3 closed
