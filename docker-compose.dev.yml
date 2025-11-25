@@ -4,11 +4,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: builder
+      target: deps
     ports:
       - "3000:3000"
     env_file:
       - .env
     volumes:
       - .:/app
-    command: npm run dev
+      - /app/node_modules
+    command: sh -c "npx prisma generate && npm run dev"

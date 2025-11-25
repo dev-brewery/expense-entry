@@ -3,8 +3,8 @@
 # ===================================
 FROM node:18-alpine AS deps
 
-# Install libc6-compat for better compatibility
-RUN apk add --no-cache libc6-compat
+# Install libc6-compat and OpenSSL for Prisma compatibility
+RUN apk add --no-cache libc6-compat openssl openssl-dev
 
 WORKDIR /app
 
@@ -19,6 +19,9 @@ RUN npm install
 # Stage 2: Builder
 # ===================================
 FROM node:18-alpine AS builder
+
+# Install OpenSSL for Prisma compatibility
+RUN apk add --no-cache openssl openssl-dev
 
 WORKDIR /app
 
@@ -47,8 +50,8 @@ RUN npm run build
 # ===================================
 FROM node:18-alpine AS runner
 
-# Install wget for health checks
-RUN apk add --no-cache wget
+# Install wget for health checks and OpenSSL for Prisma
+RUN apk add --no-cache wget openssl
 
 WORKDIR /app
 
