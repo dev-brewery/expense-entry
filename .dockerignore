@@ -9,3 +9,25 @@ npm-debug.log
 yarn-debug.log
 yarn-error.log
 .DS_Store
+
+# Add these new entries
+*.md
+!CLAUDE.md
+.claude
+TESTS
+BugReport*.txt
+*_plan.md
+DELETE_FEATURE_TESTING.md
+Initial-Enhancements.md
+tsconfig.tsbuildinfo
+.prettierrc
+.prettierignore
+.eslintrc.json
+docker-compose.yml
+docker-compose.prod.yml
+truncate-db.js
+verify-audit-table.js
+.vscode
+.idea
+coverage
+*.log
