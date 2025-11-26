@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { DeleteExpenseButton } from '@/components/DeleteExpenseButton'
 
+export const dynamic = 'force-dynamic'
+
 async function getExpenses() {
   return await prisma.expense.findMany({
     include: {

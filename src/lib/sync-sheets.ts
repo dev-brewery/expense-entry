@@ -5,6 +5,39 @@ import { ExpenseAuditRecords } from '@prisma/client';
 import { logger } from './logger';
 
 /**
+ * Default color palette for auto-generated categories
+ * Using a diverse set of pleasant colors for different expense categories
+ */
+const DEFAULT_CATEGORY_COLORS = [
+  '#EF4444', // Red - Food, Dining
+  '#F59E0B', // Amber - Shopping
+  '#10B981', // Green - Income, Savings
+  '#3B82F6', // Blue - Utilities, Bills
+  '#8B5CF6', // Purple - Entertainment
+  '#EC4899', // Pink - Personal Care
+  '#14B8A6', // Teal - Healthcare
+  '#F97316', // Orange - Transportation
+  '#6366F1', // Indigo - Education
+  '#84CC16', // Lime - Groceries
+  '#06B6D4', // Cyan - Technology
+  '#A855F7', // Violet - Subscriptions
+];
+
+/**
+ * Generate a consistent default color for a category name
+ * Uses a simple hash function to pick from the color palette
+ */
+function getDefaultColorForCategory(categoryName: string): string {
+  // Simple hash function to generate consistent color for same category name
+  let hash = 0;
+  for (let i = 0; i < categoryName.length; i++) {
+    hash = categoryName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % DEFAULT_CATEGORY_COLORS.length;
+  return DEFAULT_CATEGORY_COLORS[index];
+}
+
+/**
  * Restores an expense from the audit log
  * Called when an expense is found in Google Sheets but not in PostgreSQL,
  * and a matching unrestored audit record exists
@@ -137,14 +170,15 @@ export async function syncExpensesFromSheets(): Promise<{
         });
 
         if (!category) {
-          // Create the category with a default color
+          // Create the category with a default color based on category name
+          const defaultColor = getDefaultColorForCategory(categoryName);
           category = await prisma.category.create({
             data: {
               name: categoryName,
-              color: '#6B7280', // Default gray color
+              color: defaultColor,
             },
           });
-          logger.info(`Created new category: ${categoryName}`);
+          logger.info(`Created new category: ${categoryName} with color ${defaultColor}`);
         }
 
         // Create the expense in PostgreSQL

@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function LoginPage() {
+export const dynamic = 'force-dynamic'
+
+function LoginForm() {
     const [code, setCode] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
@@ -86,5 +88,17 @@ export default function LoginPage() {
                 </form>
             </div>
         </div>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+                <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+            </div>
+        }>
+            <LoginForm />
+        </Suspense>
     )
 }
