@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { formatDate } from './utils';
 import { retry } from './retry';
+import { logger } from './logger';
 
 // Type definitions
 export interface SheetExpense {
@@ -24,8 +25,18 @@ function getGoogleSheetsClient() {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_CREDENTIALS environment variable is not set');
   }
 
+  let parsedCredentials;
+  try {
+    parsedCredentials = JSON.parse(credentials);
+  } catch (error) {
+    throw new Error(
+      `Failed to parse GOOGLE_SERVICE_ACCOUNT_CREDENTIALS. ` +
+      `Ensure it contains valid JSON. Error: ${(error as Error).message}`
+    );
+  }
+
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(credentials),
+    credentials: parsedCredentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
@@ -153,7 +164,7 @@ async function ensureMonthSheetExists(date: Date): Promise<string> {
 
     return sheetName;
   } catch (error) {
-    console.error('Error ensuring month sheet exists:', error);
+    logger.error('Error ensuring month sheet exists', error);
     throw new Error(`Failed to create/access sheet for ${sheetName}`);
   }
 }
@@ -196,7 +207,7 @@ export async function insertExpenseToSheet(expense: {
       maxAttempts: 3,
       delayMs: 1000,
       onRetry: (attempt, error) => {
-        console.log(`[Sheets] Insert attempt ${attempt} failed:`, error.message);
+        logger.debug(`Insert attempt ${attempt} failed: ${error.message}`);
       },
     }
   );
@@ -263,7 +274,7 @@ export async function getExpensesFromSheet(options?: {
 
       expenses.push(...sheetExpenses);
     } catch (error) {
-      console.error(`Error reading sheet ${sheetName}:`, error);
+      logger.error(`Error reading sheet ${sheetName}`, error);
       // Continue with other sheets
     }
   }
@@ -336,7 +347,7 @@ export async function getMonthlyTotalsFromSheet(): Promise<MonthlyTotal[]> {
 
       totals.push({ month: monthKey, total });
     } catch (error) {
-      console.error(`Error reading total from sheet ${sheetName}:`, error);
+      logger.error(`Error reading total from sheet ${sheetName}`, error);
     }
   }
 
@@ -427,7 +438,7 @@ export async function updateExpenseInSheet(
       maxAttempts: 3,
       delayMs: 1000,
       onRetry: (attempt, error) => {
-        console.log(`[Sheets] Update attempt ${attempt} failed:`, error.message);
+        logger.debug(`Update attempt ${attempt} failed: ${error.message}`);
       },
     }
   );
@@ -454,7 +465,7 @@ export async function updateExpenseIdInSheet(
     },
   });
 
-  console.log(`[Sheets] Updated ID for row ${actualRowNumber} in sheet "${sheetName}" to: ${newId}`);
+  logger.info(`Updated ID for row ${actualRowNumber} in sheet "${sheetName}" to: ${newId}`);
 }
 
 // Delete an expense from Google Sheets (searches across all month sheets)
@@ -512,7 +523,7 @@ export async function deleteExpenseFromSheet(id: string): Promise<void> {
       maxAttempts: 3,
       delayMs: 1000,
       onRetry: (attempt, error) => {
-        console.log(`[Sheets] Delete attempt ${attempt} failed:`, error.message);
+        logger.debug(`Delete attempt ${attempt} failed: ${error.message}`);
       },
     }
   );

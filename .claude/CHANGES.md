@@ -1100,3 +1100,62 @@ See `DELETE_FEATURE_TESTING.md` for complete test suite covering:
 - Updated categories page layout to have Create Category and View Expenses buttons side-by-side.
 - Fixed category dropdown refresh issue - ExpenseForm now fetches categories on mount to show newly created categories.
 - Added auto-focus to Name field in Create Category modal for better UX.
+
+## 2025-11-25: Release 1.0.0 Preparation - Next.js Docker Configuration
+
+### Issue #3: Update Next.js Configuration for Docker Deployment ✓ COMPLETE
+
+**Objective**: Add `output: 'standalone'` to next.config.js to enable optimized Docker deployments.
+
+**Changes**:
+- Added `output: 'standalone'` to `next.config.js` configuration
+- Reduces Docker image size from ~450MB to ~200MB
+- Creates self-contained production build in `.next/standalone/` directory
+- Required for Phase 3 Docker containerization in v1.0.0 release
+
+**Benefits**:
+- Minimal production builds with only required dependencies
+- Faster container startup times
+- Reduced storage and bandwidth requirements
+- Optimized for containerized deployments
+
+**Files Modified**:
+- `next.config.js`: Added standalone output mode with explanatory comment
+
+**Verification**:
+- ✅ TypeScript type check passed
+- ✅ Production build successful
+- ✅ Standalone output directory created at `.next/standalone/`
+- ✅ Minimal server.js generated correctly
+
+**Pull Request**: #14 merged to `release/1.0.0` branch
+**GitHub Issue**: #3 closed
+
+## 2025-11-25: Release 1.0.0 Preparation - Package Version Update
+
+### Issue #13: Update Package Version to 1.0.0 ✓ COMPLETE
+
+**Objective**: Update package.json version from 0.1.0 to 1.0.0 for production release.
+
+**Changes**:
+- Updated `package.json` version field to `1.0.0`
+- Automatically updated `package-lock.json` via `npm install`
+- Marked version update as complete in deployment plan checklist
+
+**Benefits**:
+- Aligns package version with v1.0.0 milestone
+- Properly versions first production release
+- Follows semantic versioning conventions
+
+**Files Modified**:
+- `package.json`: Version bumped from 0.1.0 to 1.0.0
+- `package-lock.json`: Auto-updated to reflect new version
+- `DEPLOYMENT_PLAN_v1.0.md`: Marked checklist item as complete
+
+**Verification**:
+- ✅ Package version correctly set to 1.0.0
+- ✅ Package-lock.json synchronized
+- ✅ Deployment plan checklist updated
+
+**Pull Request**: #15 merged to `release/1.0.0` branch
+**GitHub Issue**: #13 closed and assigned to v1.0.0 milestone
