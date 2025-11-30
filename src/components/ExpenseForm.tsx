@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import CreatableSelect from 'react-select/creatable'
 import { LoadingModal } from './LoadingModal'
 import { ErrorModal } from './ErrorModal'
+import { CategoryModal } from './CategoryModal'
 
 interface Category {
   id: string
@@ -27,6 +28,8 @@ export function ExpenseForm({ defaultDate }: ExpenseFormProps) {
     value: string
     label: string
   } | null>(null)
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
+  const [initialCategoryName, setInitialCategoryName] = useState('')
 
   // Fetch categories on mount and when needed
   const fetchCategories = async () => {
@@ -45,29 +48,17 @@ export function ExpenseForm({ defaultDate }: ExpenseFormProps) {
     fetchCategories()
   }, [])
 
-  const handleCreateCategory = async (inputValue: string) => {
-    // For simplicity, we'll assign a random color.
-    // In a real app, you might want a color picker.
-    const newCategory = {
-      name: inputValue,
-      color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
-    }
+  const handleCreateCategory = (inputValue: string) => {
+    setInitialCategoryName(inputValue)
+    setIsCategoryModalOpen(true)
+  }
 
-    const response = await fetch('/api/categories', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(newCategory),
-    })
-
-    if (response.ok) {
-      const createdCategory = await response.json()
-      // Refresh categories list after creating
+  const handleCategoryCreated = async (newCategory?: Category) => {
+    if (newCategory) {
       await fetchCategories()
       setSelectedCategory({
-        value: createdCategory.id,
-        label: createdCategory.name,
+        value: newCategory.id,
+        label: newCategory.name,
       })
     }
   }
@@ -354,6 +345,13 @@ export function ExpenseForm({ defaultDate }: ExpenseFormProps) {
         title="Unable to Save Expense"
         message={errorMessage}
         onClose={() => setShowError(false)}
+      />
+
+      <CategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onSuccess={handleCategoryCreated}
+        initialName={initialCategoryName}
       />
     </>
   )

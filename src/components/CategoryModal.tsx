@@ -13,8 +13,9 @@ interface Category {
 interface CategoryModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (category?: Category) => void
   category?: Category | null
+  initialName?: string
 }
 
 export function CategoryModal({
@@ -22,6 +23,7 @@ export function CategoryModal({
   onClose,
   onSuccess,
   category,
+  initialName = '',
 }: CategoryModalProps) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('')
@@ -35,10 +37,10 @@ export function CategoryModal({
       setName(category.name)
       setColor(category.color || '#000000')
     } else {
-      setName('')
+      setName(initialName)
       setColor('#000000')
     }
-  }, [category, isOpen])
+  }, [category, isOpen, initialName])
 
   // Focus the name input when modal opens
   useEffect(() => {
@@ -72,7 +74,9 @@ export function CategoryModal({
         throw new Error(errorData.error || 'Failed to save category')
       }
 
-      onSuccess()
+      const savedCategory = await response.json()
+
+      onSuccess(savedCategory)
       onClose()
     } catch (err: any) {
       setErrorMessage(err.message)

@@ -45,8 +45,16 @@ export async function POST(request: Request) {
       )
     }
 
+    // Handle Prisma unique constraint violation
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'A category with this name already exists' },
+        { status: 409 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Failed to create category' },
+      { error: 'Failed to create category', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }
